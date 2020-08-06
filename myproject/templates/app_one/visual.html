@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js" ></script>
+
+</head>
+<body>
+    <h1>The FORM</h1>
+    <p></p>
+    <form method="POST" type="submit" value="Submit">
+        {% csrf_token %}
+        {{form}}
+        <p></p>
+
+        <!-- <input type="submit" value="Submit"> -->
+    </form>
+    
+    {% load plotly_dash%}
+    <p>this is chart</p>
+
+    <div class="{% plotly_class name='history' %} card" style="height: 100%; width: 100%;">
+        {% plotly_app name='history' ratio=0.65 %}
+    
+    </div>
+
+</body>
+</html>
