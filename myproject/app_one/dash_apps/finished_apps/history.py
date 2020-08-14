@@ -2,7 +2,7 @@ import plotly.offline as py
 from django_plotly_dash import DjangoDash
 import dash_html_components as html
 import dash_core_components as dcc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import dash_table
 import plotly.graph_objs as go
 
@@ -21,20 +21,6 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = DjangoDash('history', external_stylesheets=external_stylesheets)
 
 
-# def select_corpuses():
-#     select_corpuses = [{'label':f"Корпус {c}", 'value':c} for i in Corpus.objects.values('name_corpus') if (c:=i['name_corpus'] )]
-#     select_corpuses.append({'label':'Всі корпуси', 'value':'None'})
-#     return select_corpuses
-
-# def select_zones(c):
-#     select_zones = [ {'label':f"Зона {z}", 'value':z} for i in Zone.objects.filter(corpus__name_corpus=c).values('n_zone') if (z:= i['n_zone']) ]
-#     select_zones.append({'label':'Всі зони', 'value':'None'})
-#     return select_zones
-
-# def select_agregats(c, z):
-#     select_agregats = [ {'label':f"Агрегат {a}", 'value':a} for i in Agregat.objects.filter(n_zone__corpus__name_corpus=c, n_zone__n_zone=z).values('n_agr') if (a:=i['n_agr'])]
-#     select_agregats.append({'label':'Всі агрегати', 'value':'None'})
-#     return select_agregats
 
 dict_values = {'number_of_controller': 'Номер агрегату', 
                 't_input': 'Температура в приміщенні', 
@@ -43,14 +29,14 @@ dict_values = {'number_of_controller': 'Номер агрегату',
                 'w_current':'W пот.',
                 'pressure':'Тиск'}
 
-li = ['capacity_warm', 'pressure', 't_output', 't_input', 'ztime', 'zdate', 't_delta', 'capacity_warm', 'capacity_current', 'pressure', 'digital_input', 'digital_output']
+li = ['capacity_warm', 'pressure', 't_output', 't_input', 'ztime', 'zdate', 't_delta', 'capacity_current', 'pressure', 'digital_input', 'digital_output']
 list_options = [{'label': i, 'value': i} for i in li]
 
 
 app.layout = html.Div([
     html.Div([
         html.Div([
-            # dcc.Store(id='memory-output'),
+            dcc.Store(id='memory-label'),
             dcc.Store(id='memory-data'),
             
             dcc.DatePickerRange(
@@ -66,6 +52,7 @@ app.layout = html.Div([
                     'width': '300px' 
                 },
             ),
+            
    
 
             dcc.Dropdown(
@@ -81,24 +68,65 @@ app.layout = html.Div([
                 },
             ),
         ]),
-        dcc.Checklist(
-            id='checklist-one',
-            options = list_options,
-            labelStyle={'display': 'block'},
-        )
+        html.Div([
+
+            html.Div([
+                dcc.Checklist(
+                    id='checklist-one',
+                    # options = [{'label': 'i', 'value': 'i'} ],
+                    labelStyle={'display': 'block', 'margin': '10px 10px', 'border-top': '1px solid #333'},
+                    style={'border': '1px solid #333'},
+                ),
+                html.Button('Submit', id='submit-val', n_clicks=0)
+            # ], style={'margin': '10px 10px', }
+            ]),
+            
+            dcc.Markdown(id='p-test', style={'line-height': '4px', 'margin-top':'-7px'}),
+        ], style={'display':'flex','justify-content':'start'},),
+
+        html.Table([
+            html.Tbody([
+                html.Tr([
+                    html.Td(children='a', style={'border': '1px solid #333'}), 
+                    html.Td(children='a', style={'border': '1px solid #333', 'padding': '10px 10px'})
+                ]),
+                html.Tr([
+                    html.Td(children='g'), 
+                    html.Td(children='a', style={'border': '1px solid #333', 'padding': '10px 10px'})
+                ]),                
+                html.Tr([
+                    html.Td([dcc.Checklist(id='ddd', options = [{'label': 'i8', 'value': 'i'}, {'label': 'i', 'value': 'i7'} ] )]), 
+                    html.Td(children='a', style={'border': '1px solid #333', 'padding': '10px 10px'})
+                ])
+            ])
+            # html.Td(children=value)
+        ], style={ 
+                    'border-collapse': 'collapse',
+                    'border': '2px solid rgb(100, 100, 100)',
+                    # 'letter-spacing': '1px',
+                    # 'font-family': 'sans-serif',
+                    # 'font-size': '.7rem'
+                    })
     ]),
     
-
+    
+    
     html.Div([
-        dcc.Graph(
-            id='graph',
-            animate=True,
+        # dcc.Graph(
+        #     id='graph',
+        #     animate=True,
+        # ),
+        dcc.Loading(
+            id='loading-1',
+            type='cube',
+            children=dcc.Graph(id='graph', animate=True,)
         ),
 
         dash_table.DataTable(
             id='table',
             # fixed_rows={'headers': True},
             style_table={'height': '200px', 'overflowY': 'auto'},
+
 
             
         ),
@@ -110,127 +138,119 @@ app.layout = html.Div([
 
 
 @app.callback(
-    # Output('dropdown-three', 'options'), 
-    # [Output('memory-output', 'data'),
-    Output('memory-data', 'data'),
+    [Output('memory-data', 'data'), Output('memory-label', 'data')],
     
     [Input('data-picker-range', 'start_date'), 
     Input('data-picker-range', 'end_date'), 
     Input('dropdown-three', 'value')])
 def main(start_date, end_date, n_agregat):
-    print(f'{n_agregat=}')
-    print(n_agregat == 'None')
+
     
     if n_agregat == 'None':
-        return '',
+        return '', []
     elif isinstance(int(n_agregat), int):
-        print('___________________________________________________________________________@@@@@@@')
+        # print('___________________________________________________________________________@@@@@@@')
         inst_data = CorpZoneAgr(n_agregat, start_date, end_date)
-        print('INSTANCE')
-        get_test = inst_data.get()
-        get_test = pandas.DataFrame(get_test)
-        get_test['date_time'] = get_test.zdate.astype(str) +' ' + get_test.ztime.astype(str)
-        get_test['date_time'] = pandas.to_datetime(get_test['date_time'])
+        # print('INSTANCE')
+        # get_test = inst_data.get_df()
+        get_test2 = inst_data.get_data()
+        # get_test2[0]
+        # get_test['date_time'] = get_test.zdate.astype(str) +' ' + get_test.ztime.astype(str)
+        # get_test['date_time'] = 
         
-        # get_test.set_index('date_time', inplace=True)
-        # get_test = get_test['date_time']
-        print(get_test.date_time)
-        # data_df = inst_data.get_data()
-        print('GET ALREADY')
-        print('START INTO DICT')
-        # data = data_df.to_dict('records')
-        print('END INTO DICT')
-        # all_columns = data_df.columns.values.tolist()
-        # print(all_columns)
-        # print(data_df)
-        return get_test.to_dict('records')
-    # if n_corpus == 'None':
-    #     return [{'label':'Всі зони', 'value':'None'}], [{'label':'Всі агрегати', 'value':'None'}], '', '', ''
+        # print(get_test.date_time)
+        # print('GET ALREADY')
+        # print('START INTO DICT')
+        # print('END INTO DICT')
+        print('start 2')
+        get_ind2 = [{'label': i, 'value': i} for i in get_test2[0]]
+        print('end 2')
 
-    # elif ((n_corpus!='None') and (n_zone!='None')):
-    #     if isinstance(n_agregat, int):
-    #         inst_all_data = CorpZoneAgr(n_corpus, n_zone, n_agregat, start_date, end_date)
-    #         all_data = inst_all_data.get_df()
-    #         data= all_data.to_dict('records')
-    #         all_data_column = all_data.columns.values.tolist()[:-2]
-    #         # print(all_data_column)
-    #         return select_zones(n_corpus), select_agregats(n_corpus, n_zone), f'{all_data}', all_data_column, data
-            
-    #     else:
-    #         return select_zones(n_corpus), select_agregats(n_corpus, n_zone), '', '', ''
-    # elif isinstance(n_corpus, int):
-    #     return select_zones(n_corpus), [{'label':'Всі агрегати', 'value':'None'}], '', '', ''
+        # print('start 1 ')
+        # get_ind = [{'label': i, 'value': i} for i in get_test.columns]
+        # print('end 1')
+        return get_test2, get_ind2
+        # return get_test.to_dict('records'), get_ind
 
-# @app.callback(
-#     Output('checklist-one', 'options'),
-#     [Input('memory-data', 'data')]
-# )
-# def get_test(data):
-#     # list_options = [{'label': i, 'value': i} for i in data_label]
-#     li = ['capacity_warm', 'pressure', 't_output', 't_input', 'ztime', 'zdate', 't_delta', 'capacity_warm', 'capacity_current', 'pressure', 'digital_input', 'digital_output']
-#     list_options = [{'label': i, 'value': i} for i in li]
-#     print('###############################################################################')
-    
-#     # print(data_label)
-#     # if data_label == []:
-#     #     return [{'label': 'New', 'value': 'YC'}]
-    
-#     return list_options
+
+@app.callback(
+    Output('checklist-one', 'options'),
+    [Input('dropdown-three', 'value')]
+)
+def get_test(value):
+    # list_options = [{'label': 'i', 'value': 'i'} ]
+    print(f'{value=}')
+    if value == None:
+        # return list_options
+        return []
+    elif value == '1':
+        return list_options
+    else:
+        return []
+
 
 @app.callback(
     [Output('table', 'data'), Output('table', 'columns')],
-    [Input('checklist-one', 'value'), Input('memory-data', 'data')]
+    [Input('submit-val', 'n_clicks'), Input('memory-data', 'data')],
+    [State('checklist-one', 'value')] #Input('checklist-one', 'value')
 )
-def get_table(value, data):
-    print('SSSSSSSSSSSSSSSSSS')
-    # inst_data = CorpZoneAgr(1, '2001-1-1', '2001-8-1')
-    # get_data = inst_data.get()
-    # get_data = pandas.DataFrame(get_data)
-    print('EEEEEEEEEEEEEEEEEEEEEEEE')
-    # get_data = get_data.to_dict('records')
-    # print(f'{get_data=}')
-    print('jjjjjjjjjjjjjjjjjjjjjjjjjjjjjj')
-    # if value == []:
-    #     return [], [{'name':'name', 'id':'id'}]
-    # print(f'{data}')
-    # print(f'{value=}')
+def get_table(n_clicks, data, value):
+    print(f'{n_clicks}')
     if value == None:
         columns = [{'name': '', 'id':'' }]
     else:
         columns = [{'name':i, 'id':i} for i in value]
-    # if not data:
-    #     data = []
-    # print(data)
     return data, columns
-
-    # try:
-    #     columns = [{'name':i, 'id':i} for i in value]
-    #     print(columns)
-    # except TypeError:
-    #     print('TypeError')
-    #     columns = [{'name': '', 'id':'id' }]
-    # return data, columns
     
 
 @app.callback(
     Output('graph', 'figure'),
-    [Input('checklist-one', 'value'), Input('memory-data', 'data')]
+    [Input('submit-val', 'n_clicks'), Input('memory-data', 'data')],
+    [State('checklist-one', 'value')]
 )
-def get_graph(value, data):
-    inst_data = CorpZoneAgr(1, '2001-1-1', '2001-8-1')
-    get_data = inst_data.get()
-    get_data = pandas.DataFrame(get_data)
-    
+def get_graph(n_clicks, data, value ):    
+    print('Load start')
+   
     layout = go.Layout(title='Graph')
                         # xaxis=dict(range=[min('0'), max('1000')]),
                         # yaxis=dict(range=[min(0), max(500)]),)
-    
+
     data_df = pandas.DataFrame(data)
-    print('fffffffffffffffffffffff')
-    print(f'{data_df=}')
-    print(f'{len(data_df.date_time)}')
-    print(f'{len(data_df.digital_input)}')
-    data = [{'x':data_df.date_time[:100], 'y':data_df[i][:100], 'name':i} for i in value]
-    # data = [{'x':data_df.date_time[:17747], 'y':data_df.digital_input[:17747], 'name':'digital_input'}]
-    print(data_df[['date_time', 'digital_input']])
+    if data == None:
+        data = [{'x':[0], 'y':[0], 'name':''}]
+    elif (value != None) and data:
+        data = [{'x':data_df.zdate, 'y':data_df[i], 'name':i} for i in value]
+        # data = [{'x':data_df.date_time, 'y':data_df[i], 'name':i} for i in value]
+    else:
+        data = [{'x':[0], 'y':[0], 'name':''}]
+    print('Load end')
     return {'data':data, 'layout':layout}
+
+@app.callback(
+    Output('p-test', 'children'),
+    [Input('submit-val', 'n_clicks'), Input('graph', 'hoverData')],
+    [State('checklist-one', 'value')]
+)
+def send_res(n_clicks, hoverData, value):
+    print(f'{value=}')
+
+    if hoverData == []:
+        return ''
+    t = [(f"{dict_values.get(value[i.get('curveNumber')], value[i.get('curveNumber')]  )} - {i.get('y')} \n") for i in hoverData['points'] ]
+    t.append(f"Дата та час {hoverData['points'][0]['x']}")
+    return t
+
+    #     v = value.get('points')[0].get('y')
+    #     return v
+    # else:
+    #     return ''
+
+
+    # if hoverData == []:        
+    #     return ''
+    # t = [(f"{dict_values.get(value[i.get('curveNumber')], value[i.get('curveNumber')]  )} - {i.get('y')} \n") for i in hoverData['points'] ]
+    # t.append(f"Дата та час {hoverData['points'][0]['x']}")
+    # return t
+
+
+

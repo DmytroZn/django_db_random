@@ -22,7 +22,7 @@ class CorpZoneAgr:
 
     def get_df(self):
         res = df(self.get_data())
-        print(f'{res=}')
+        # print(f'{res=}')
         # res['id_zone'] = df(res['id_zone'].values.tolist(), columns=['zdate', 'ztime'])
         # try:
         
